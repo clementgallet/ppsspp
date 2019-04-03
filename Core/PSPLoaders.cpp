@@ -204,7 +204,7 @@ bool Load_PSP_ISO(FileLoader *fileLoader, std::string *error_string) {
 	// Bypass Chinese translation patches, see comment above.
 	for (size_t i = 0; i < ARRAY_SIZE(altBootNames); i++) {
 		if (pspFileSystem.GetFileInfo(altBootNames[i]).exists) {
-			bootpath = altBootNames[i];			
+			bootpath = altBootNames[i];
 		}
 	}
 
@@ -256,7 +256,7 @@ bool Load_PSP_ISO(FileLoader *fileLoader, std::string *error_string) {
 	host->SendUIMessage("config_loaded", "");
 	INFO_LOG(LOADER,"Loading %s...", bootpath.c_str());
 
-	std::thread th([bootpath] {
+	std::function<void()> execLoaderFunc = [bootpath] {
 		setCurrentThreadName("ExecLoader");
 		PSP_LoadingLock guard;
 		if (coreState != CORE_POWERUP)
@@ -272,8 +272,15 @@ bool Load_PSP_ISO(FileLoader *fileLoader, std::string *error_string) {
 			// TODO: This is a crummy way to communicate the error...
 			PSP_CoreParameter().fileToStart = "";
 		}
-	});
-	th.detach();
+	};
+
+	// if (g_Config.bEnforceSingleThreaded) {
+	// 	execLoaderFunc();
+	// } else {
+		std::thread th(execLoaderFunc);
+		th.detach();
+	// }
+
 	return true;
 }
 

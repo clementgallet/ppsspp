@@ -1,6 +1,7 @@
 #include "base/logging.h"
 #include "thread/threadpool.h"
 #include "thread/threadutil.h"
+#include "Core/Config.h"
 
 ///////////////////////////// WorkerThread
 
@@ -81,7 +82,9 @@ void LoopWorkerThread::WorkFunc() {
 ///////////////////////////// ThreadPool
 
 ThreadPool::ThreadPool(int numThreads) : workersStarted(false) {
-	if (numThreads <= 0) {
+	if (g_Config.bEnforceSingleThreaded) {
+		numThreads_ = 0;
+	} else if (numThreads <= 0) {
 		numThreads_ = 1;
 		ILOG("ThreadPool: Bad number of threads %i", numThreads);
 	} else if (numThreads > 8) {
@@ -103,11 +106,13 @@ void ThreadPool::StartWorkers() {
 
 void ThreadPool::ParallelLoop(const std::function<void(int,int)> &loop, int lower, int upper) {
 	int range = upper - lower;
-	if (range >= numThreads_ * 2) { // don't parallelize tiny loops (this could be better, maybe add optional parameter that estimates work per iteration)
+	if (g_Config.bEnforceSingleThreaded) {
+		loop(lower, upper);
+	} else if (range >= numThreads_ * 2) { // don't parallelize tiny loops (this could be better, maybe add optional parameter that estimates work per iteration)
 		std::lock_guard<std::mutex> guard(mutex);
 		StartWorkers();
 
-		// could do slightly better load balancing for the generic case, 
+		// could do slightly better load balancing for the generic case,
 		// but doesn't matter since all our loops are power of 2
 		int chunk = range / numThreads_;
 		int s = lower;
@@ -124,4 +129,3 @@ void ThreadPool::ParallelLoop(const std::function<void(int,int)> &loop, int lowe
 		loop(lower, upper);
 	}
 }
-

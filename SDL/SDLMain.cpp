@@ -545,7 +545,7 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
-	bool useEmuThread = g_Config.iGPUBackend == (int)GPUBackend::OPENGL;
+	bool useEmuThread = (g_Config.iGPUBackend == (int)GPUBackend::OPENGL) && !g_Config.bEnforceSingleThreaded;
 
 	SDL_SetWindowTitle(window, (app_name_nice + " " + PPSSPP_GIT_VERSION).c_str());
 
@@ -869,7 +869,7 @@ int main(int argc, char *argv[]) {
 		}
 
 		bool renderThreadPaused = windowHidden && g_Config.bPauseWhenMinimized && emuThreadState != (int)EmuThreadState::DISABLED;
-		if (emuThreadState != (int)EmuThreadState::DISABLED && !renderThreadPaused) {
+		if (!renderThreadPaused) {
 			if (!graphicsContext->ThreadFrame())
 				break;
 		}

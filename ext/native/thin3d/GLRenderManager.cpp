@@ -7,6 +7,7 @@
 #include "base/logging.h"
 #include "GPU/GPUState.h"
 #include "Common/MemoryUtil.h"
+#include "Core/Config.h"
 
 #if 0 // def _DEBUG
 #define VLOG ILOG
@@ -171,10 +172,12 @@ bool GLRenderManager::ThreadFrame() {
 		}
 		FrameData &frameData = frameData_[threadFrame_];
 		{
-			std::unique_lock<std::mutex> lock(frameData.pull_mutex);
-			while (!frameData.readyForRun && run_) {
-				VLOG("PULL: Waiting for frame[%d].readyForRun", threadFrame_);
-				frameData.pull_condVar.wait(lock);
+			if (!g_Config.bEnforceSingleThreaded) {
+				std::unique_lock<std::mutex> lock(frameData.pull_mutex);
+				while (!frameData.readyForRun && run_) {
+					VLOG("PULL: Waiting for frame[%d].readyForRun", threadFrame_);
+					frameData.pull_condVar.wait(lock);
+				}
 			}
 			if (!frameData.readyForRun && !run_) {
 				// This means we're out of frames to render and run_ is false, so bail.
@@ -244,9 +247,11 @@ void GLRenderManager::StopThread() {
 			frameData.steps.clear();
 			frameData.initSteps.clear();
 
-			while (!frameData.readyForFence) {
-				VLOG("PUSH: Waiting for frame[%d].readyForFence = 1 (stop)", i);
-				frameData.push_condVar.wait(lock);
+			if (!g_Config.bEnforceSingleThreaded) {
+				while (!frameData.readyForFence) {
+					VLOG("PUSH: Waiting for frame[%d].readyForFence = 1 (stop)", i);
+					frameData.push_condVar.wait(lock);
+				}
 			}
 		}
 	} else {
@@ -404,10 +409,12 @@ void GLRenderManager::BeginFrame() {
 
 	// Make sure the very last command buffer from the frame before the previous has been fully executed.
 	{
-		std::unique_lock<std::mutex> lock(frameData.push_mutex);
-		while (!frameData.readyForFence) {
-			VLOG("PUSH: Waiting for frame[%d].readyForFence = 1", curFrame);
-			frameData.push_condVar.wait(lock);
+		if (!g_Config.bEnforceSingleThreaded) {
+			std::unique_lock<std::mutex> lock(frameData.push_mutex);
+			while (!frameData.readyForFence) {
+				VLOG("PUSH: Waiting for frame[%d].readyForFence = 1", curFrame);
+				frameData.push_condVar.wait(lock);
+			}
 		}
 		frameData.readyForFence = false;
 		frameData.readyForSubmit = true;
@@ -565,11 +572,13 @@ void GLRenderManager::FlushSync() {
 		frameData.pull_condVar.notify_all();
 	}
 	{
-		std::unique_lock<std::mutex> lock(frameData.push_mutex);
-		// Wait for the flush to be hit, since we're syncing.
-		while (!frameData.readyForFence) {
-			VLOG("PUSH: Waiting for frame[%d].readyForFence = 1 (sync)", curFrame);
-			frameData.push_condVar.wait(lock);
+		if (!g_Config.bEnforceSingleThreaded) {
+			std::unique_lock<std::mutex> lock(frameData.push_mutex);
+			// Wait for the flush to be hit, since we're syncing.
+			while (!frameData.readyForFence) {
+				VLOG("PUSH: Waiting for frame[%d].readyForFence = 1 (sync)", curFrame);
+				frameData.push_condVar.wait(lock);
+			}
 		}
 		frameData.readyForFence = false;
 		frameData.readyForSubmit = true;
@@ -607,6 +616,9 @@ void GLRenderManager::Wipe() {
 
 void GLRenderManager::WaitUntilQueueIdle() {
 	// Just wait for all frames to be ready.
+	if (g_Config.bEnforceSingleThreaded)
+		return;
+
 	for (int i = 0; i < MAX_INFLIGHT_FRAMES; i++) {
 		FrameData &frameData = frameData_[i];
 
@@ -742,7 +754,7 @@ void GLPushBuffer::NextBuffer(size_t minSize) {
 }
 
 void GLPushBuffer::Defragment() {
-	_dbg_assert_msg_(G3D, !OnRenderThread(), "Defragment must not run on the render thread");
+	// _dbg_assert_msg_(G3D, !OnRenderThread(), "Defragment must not run on the render thread");
 
 	if (buffers_.size() <= 1) {
 		// Let's take this chance to jetison localMemory we don't need.

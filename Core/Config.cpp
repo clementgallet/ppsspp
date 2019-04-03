@@ -400,6 +400,7 @@ static ConfigSetting generalSettings[] = {
 	ConfigSetting("DiscordPresence", &g_Config.bDiscordPresence, true, true, false),  // Or maybe it makes sense to have it per-game? Race conditions abound...
 
 	ReportedConfigSetting("NumWorkerThreads", &g_Config.iNumWorkerThreads, &DefaultNumWorkers, true, true),
+	ConfigSetting("EnforceSingleThreaded", &g_Config.bEnforceSingleThreaded, false),
 	ConfigSetting("AutoLoadSaveState", &g_Config.iAutoLoadSaveState, 0, true, true),
 	ReportedConfigSetting("EnableCheats", &g_Config.bEnableCheats, false, true, true),
 	ConfigSetting("CwCheatRefreshRate", &g_Config.iCwCheatRefreshRate, 77, true, true),
