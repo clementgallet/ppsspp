@@ -274,12 +274,12 @@ bool Load_PSP_ISO(FileLoader *fileLoader, std::string *error_string) {
 		}
 	};
 
-	// if (g_Config.bEnforceSingleThreaded) {
-	// 	execLoaderFunc();
-	// } else {
+	if (g_Config.bEnforceSingleThreaded) {
+		execLoaderFunc();
+	} else {
 		std::thread th(execLoaderFunc);
 		th.detach();
-	// }
+	}
 
 	return true;
 }
