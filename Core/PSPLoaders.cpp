@@ -16,6 +16,7 @@
 // https://github.com/hrydgard/ppsspp and http://www.ppsspp.org/.
 
 #include <thread>
+#include <functional>
 
 #include "file/file_util.h"
 #include "util/text/utf8.h"
